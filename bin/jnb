@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# jnb: open a Jupyter notebook as its own self-contained process.
+#
+#   jnb              new scratch notebook in $JNB_SCRATCH_DIR (default ~/py_notebooks)
+#   jnb file.ipynb   open file.ipynb, creating it if it doesn't exist
+#
+# The kernel uses the uv project you run jnb from. Outside a project it uses
+# $JNB_SCRATCH_DIR if that is a uv project, and a bare environment otherwise.
+set -euo pipefail
+
+JNB_HOME="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+SCRATCH="${JNB_SCRATCH_DIR:-$HOME/py_notebooks}"
+
+f="${1:-}"
+if [[ -z "$f" ]]; then
+  base="$SCRATCH/scratch-$(date +%b-%-d-%Y)"
+  f="$base.ipynb"
+  n=2
+  while [[ -e "$f" ]]; do f="$base-$n.ipynb"; n=$((n + 1)); done
+fi
+if [[ ! -e "$f" ]]; then
+  mkdir -p "$(dirname "$f")"
+  cat > "$f" <<'NB'
+{
+ "cells": [{"cell_type": "code", "id": "a1", "metadata": {}, "source": [], "outputs": [], "execution_count": null}],
+ "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"}},
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+NB
+fi
+
+# nearest pyproject.toml from here up; --with-requirements layers Jupyter on top
+# of that project's environment without touching its dependencies
+proj="$PWD"
+while [[ "$proj" != / && ! -e "$proj/pyproject.toml" ]]; do proj="$(dirname "$proj")"; done
+if [[ -e "$proj/pyproject.toml" ]]; then
+  env_args=(--project "$proj")
+elif [[ -e "$SCRATCH/pyproject.toml" ]]; then
+  env_args=(--project "$SCRATCH")
+else
+  env_args=(--no-project)
+fi
+
+cd "$(dirname "$f")"
+# Jupyter settings come only from this repo; jnb_watch exits the server as soon
+# as the tab is closed and focuses the first cell of a new notebook
+export JUPYTER_CONFIG_DIR="$JNB_HOME/jupyter"
+export PYTHONPATH="$JNB_HOME/ext${PYTHONPATH:+:$PYTHONPATH}"
+exec uv run "${env_args[@]}" --with-requirements "$JNB_HOME/requirements.txt" \
+  jupyter notebook --ServerApp.jpserver_extensions=jnb_watch=True "$(basename "$f")"

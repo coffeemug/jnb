@@ -1,0 +1,4 @@
+__pycache__/
+# written by Jupyter at runtime
+jupyter/lab/workspaces/
+jupyter/migrated
