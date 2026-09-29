@@ -13,8 +13,9 @@ jnb file.ipynb   # open file.ipynb, creating it in the current directory if need
   scratch directory's project if it has one, and a bare environment otherwise.
 - New notebooks open with the cursor in the first cell.
 - No top bar, autosave every 5 seconds, one Ctrl-C shuts the server down.
-- Jupyter settings come only from this repo's `jupyter/` folder, so your global
-  `~/.jupyter` isn't used or modified.
+- Jupyter config comes from this repo's `jupyter/` folder. Your global JupyterLab
+  UI settings (`~/.jupyter/lab/user-settings`) are used as defaults, with jnb's
+  own settings taking precedence; `~/.jupyter` is never modified.
 
 ## Install
 

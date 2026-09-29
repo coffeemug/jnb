@@ -43,8 +43,10 @@ else
 fi
 
 cd "$(dirname "$f")"
-# Jupyter settings come only from this repo; jnb_watch exits the server as soon
-# as the tab is closed and focuses the first cell of a new notebook
+# Jupyter config comes from this repo, with your global JupyterLab UI settings
+# as defaults under it; jnb_watch exits the server as soon as the tab is closed
+# and focuses the first cell of a new notebook
+export JNB_GLOBAL_SETTINGS_DIR="${JUPYTER_CONFIG_DIR:-$HOME/.jupyter}/lab/user-settings"
 export JUPYTER_CONFIG_DIR="$JNB_HOME/jupyter"
 export PYTHONPATH="$JNB_HOME/ext${PYTHONPATH:+:$PYTHONPATH}"
 exec uv run "${env_args[@]}" --with-requirements "$JNB_HOME/requirements.txt" \

@@ -3,12 +3,16 @@
 - shut the server down as soon as its notebook tab is closed, so each `jnb`
   run is one self-contained process;
 - on a brand-new notebook (a single empty cell), put the cursor in that cell;
-- open the browser straight at the notebook, not the file browser.
+- open the browser straight at the notebook, not the file browser;
+- use your global JupyterLab settings as defaults under jnb's own.
 """
 
+import glob
+import json
 import os
 import time
 
+import json5
 from jupyter_server.utils import url_escape, url_path_join
 from tornado.ioloop import PeriodicCallback
 from tornado.web import OutputTransform
@@ -58,6 +62,28 @@ class _InjectFocusScript(OutputTransform):
 
 def _jupyter_server_extension_points():
     return [{"module": "jnb_watch"}]
+
+
+def _link_jupyter_server_extension(serverapp):
+    # JupyterLab reads labconfig/default_setting_overrides.json as defaults
+    # under its user settings (jnb's own), and only once while loading, so
+    # write it here in the link step, which runs before any extension loads
+    src = os.environ.get("JNB_GLOBAL_SETTINGS_DIR", "")
+    overrides = {}
+    for path in sorted(glob.glob(os.path.join(src, "**", "*.jupyterlab-settings"), recursive=True)):
+        pkg, name = os.path.split(os.path.relpath(path, src))
+        try:
+            with open(path, encoding="utf-8") as f:
+                overrides[f"{pkg.replace(os.sep, '/')}:{name.removesuffix('.jupyterlab-settings')}"] = json5.load(f)
+        except Exception as e:
+            serverapp.log.warning("jnb: skipping global setting %s: %s", path, e)
+
+    dest = os.path.join(serverapp.config_dir, "labconfig", "default_setting_overrides.json")
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    tmp = f"{dest}.{os.getpid()}"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(overrides, f, indent=2)
+    os.replace(tmp, dest)  # other jnb servers may be reading it
 
 
 def _load_jupyter_server_extension(serverapp):
