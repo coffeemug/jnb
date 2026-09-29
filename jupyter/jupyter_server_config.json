@@ -1,5 +1,6 @@
 {
   "ServerApp": {
-    "answer_yes": true
+    "answer_yes": true,
+    "use_redirect_file": false
   }
 }

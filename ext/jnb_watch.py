@@ -2,11 +2,14 @@
 
 - shut the server down as soon as its notebook tab is closed, so each `jnb`
   run is one self-contained process;
-- on a brand-new notebook (a single empty cell), put the cursor in that cell.
+- on a brand-new notebook (a single empty cell), put the cursor in that cell;
+- open the browser straight at the notebook, not the file browser.
 """
 
+import os
 import time
 
+from jupyter_server.utils import url_escape, url_path_join
 from tornado.ioloop import PeriodicCallback
 from tornado.web import OutputTransform
 
@@ -28,9 +31,15 @@ FOCUS_SCRIPT = b"""<script>
   const nb = panel.content;
   if (nb.widgets.length !== 1 || nb.widgets[0].model.sharedModel.getSource() !== "") return;
   await until(() => nb.widgets[0].editor);
-  nb.activeCellIndex = 0;
-  nb.mode = "edit";
-  nb.widgets[0].editor.focus();
+  const focus = () => {
+    nb.activeCellIndex = 0;
+    nb.mode = "edit";
+    nb.widgets[0].editor.focus();
+  };
+  focus();
+  // opened straight from the OS, the page can be ready before the browser
+  // window is active, and activating the window takes focus off the cell
+  if (!document.hasFocus()) window.addEventListener("focus", () => setTimeout(focus), {once: true});
 })();
 </script>"""
 
@@ -53,6 +62,14 @@ def _jupyter_server_extension_points():
 
 def _load_jupyter_server_extension(serverapp):
     serverapp.web_app.transforms.append(_InjectFocusScript)
+
+    # with use_redirect_file off, Jupyter opens default_url and ignores the file
+    # it was given, so make the notebook itself the default url
+    if serverapp.file_to_run:
+        rel = os.path.relpath(os.path.abspath(serverapp.file_to_run), serverapp.root_dir)
+        serverapp.default_url = url_path_join(
+            serverapp.base_url, "notebooks", url_escape(url_path_join(*rel.split(os.sep)))
+        )
 
     started = time.monotonic()
     last_connected = None
